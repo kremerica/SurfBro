@@ -17,25 +17,26 @@ export default function WhereToBro({ route }) {
     const [swellList, setSwellList] = useState([])
     const [tideList, setTideList] = useState([])
 
-    const fetchSwellData = async (days = 1) => {
+    const fetchSwellData = async (days = 3) => {
         try {
             const swellURL = `https://services.surfline.com/kbyg/spots/forecasts/swells?cacheEnabled=true&${days}&intervalHours=1&spotId=5842041f4e65fad6a7708807&units%5BswellHeight%5D=FT`
             const response = await fetch(swellURL);
             const swellData = await response.json();
 
             // find target swell
-            setSwellList(findClosestTimestamp(swellData));
+            setSwellList(findClosestSwell(swellData, conditionsTimestamp));
         } catch (error) {
             console.error("Failed to fetch swell data: ", error);
         }
     };
 
-    const fetchTideData = async (days = 1) => {
+    const fetchTideData = async (days = 3) => {
         try {
             const tideURL = `https://services.surfline.com/kbyg/spots/forecasts/tides?spotId=5842041f4e65fad6a7708807&days=${days}`
             const response = await fetch(tideURL);
             const tideData = await response.json();
-            setTideList(tideData);
+            
+            setTideList(findClosestTide(tideData.data.tides, conditionsTimestamp));
         } catch (error) {
             console.error("Failed to fetch tide data: ", error);
         }
@@ -46,28 +47,47 @@ export default function WhereToBro({ route }) {
         fetchTideData();
     }, []);
 
-    const findClosestTimestamp = (swells, targetTimestamp) => {
+    const findClosestSwell = (swells, targetTimestamp) => {
         var index = 0;
 
         while (swells.data.swells[index].timestamp < targetTimestamp) {
-            console.log(swells.data.swells[index].timestamp)
             index++;
         }
 
         return swells.data.swells[index];
     };
 
+    const findClosestTide = (tides, targetTimestamp) => {
+        var index = 0;
+
+        while (index < tides.length && tides[index].timestamp < targetTimestamp) {
+            //console.log("Tide: ", tides[index].timestamp, " vs. ", targetTimestamp);
+            index++;
+        }
+
+        return tides[index];
+    };
+
+
     return (
         <SafeAreaView style={styles.container}>
             <ScrollView>
+                {/* show time of day */}
                 <Text>{dayjs(conditionsTimestamp * 1000).format('MMMM D, YYYY h:mm A')}</Text>
+                
+                {/* show swells */}
                 {swellList && swellList.swells && swellList.swells
                     .filter(swell => swell.power >= MIN_POWER)
                     .map((swell, index) => (
                         <Text key={index}>
-                        Height: {swell.height}, Period: {swell.period}, Direction: {Math.round(swell.direction)}
+                            Height: {parseFloat(swell.height.toPrecision(2))}, Period: {swell.period}, Direction: {Math.round(swell.direction)}
                         </Text>
                 ))}
+
+
+                {/* show tides */}
+                <Text>Tide: {tideList.height}</Text>
+
             </ScrollView>
             <Text>{/*JSON.stringify(tideList, null, 2)*/}</Text>
                 {/*
